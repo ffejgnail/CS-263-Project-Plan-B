@@ -80,6 +80,7 @@ func (ag *Agent) Act(x, y int, env *Environment) {
 			ag2.IsAttacked = true
 			ag.IsAttacking = true
 			ag2.Direction = ag.Direction ^ 2
+			env.Aggressiveness[0]++
 		}
 	}
 }

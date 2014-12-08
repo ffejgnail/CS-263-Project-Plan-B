@@ -1,7 +1,7 @@
 package main
 
 const (
-	Iteration       = 1000
+	Iteration       = 10000
 	RecordIteration = 10
 	RecordDelay     = 20
 	CellPixel       = 30
@@ -14,4 +14,9 @@ const (
 
 const (
 	InitAnimatNum   = 160
+)
+
+const (
+	RecordGIF       = false
+	RewardLongevity = true
 )

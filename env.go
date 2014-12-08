@@ -6,6 +6,7 @@ import (
 	"image/gif"
 	"io"
 	"math/rand"
+	"time"
 )
 
 type EnvCell struct {
@@ -14,8 +15,9 @@ type EnvCell struct {
 }
 
 type Environment struct {
-	Cell    [EnvSize][EnvSize]EnvCell
-	record  gif.GIF
+	Cell            [EnvSize][EnvSize]EnvCell
+	Aggressiveness  [7]uint32
+	record          gif.GIF
 }
 
 func (env *Environment) WriteTo(w io.Writer) error { // generating GIF
@@ -38,20 +40,22 @@ func (env *Environment) pickFreeLoc () (int, int) {
 }
 
 func NewEnvironment() *Environment {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	env := new(Environment)
 
-	cx := EnvSize / 2
-	cy := EnvSize / 2
-	for i := -4; i <= 4; i++ {
-		for j := -4; j <= 4; j++ {
-			for k := 0; k <= 4; k++ {
-				if i*i+j*j <= k*k {
-					env.relCell(cx, cy, i, j).Food = uint8(4 - k)
-					break
-				}
-			}
-		}
-	}
+//	cx := EnvSize / 2
+//	cy := EnvSize / 2
+//	for i := -4; i <= 4; i++ {
+//		for j := -4; j <= 4; j++ {
+//			for k := 0; k <= 4; k++ {
+//				if i*i+j*j <= k*k {
+//					env.relCell(cx, cy, i, j).Food = uint8(4 - k)
+//					break
+//				}
+//			}
+//		}
+//	}
 
 	for i := uint8(0); i < InitAnimatNum; i++ {
 		brain := new(SimpleBrain)
@@ -69,11 +73,14 @@ func NewEnvironment() *Environment {
 		env.Cell[x][y].Agent = ag
 	}
 
-	env.record.Image = make([]*image.Paletted, RecordIteration)
-	env.record.Delay = make([]int, RecordIteration)
-	for i := 0; i < RecordIteration; i++ {
-		env.record.Delay[i] = RecordDelay
+	if RecordGIF {
+		env.record.Image = make([]*image.Paletted, RecordIteration)
+		env.record.Delay = make([]int, RecordIteration)
+		for i := 0; i < RecordIteration; i++ {
+			env.record.Delay[i] = RecordDelay
+		}
 	}
+
 	return env
 }
 
@@ -105,6 +112,16 @@ func grassColor(grass uint8) color.Color {
 	return grassColor5
 }
 
+func popCount(x uint32) uint32 {
+	mask := []uint32{0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF, 0x0000FFFF,}
+	shift := uint32(1)
+	for i := 0; i < 5; i++ {
+		x = (x & mask[i]) + ((x >> shift) & mask[i])
+		shift <<= 1
+	}
+	return x
+}
+
 func (env *Environment) Run(iter int) {
 	type Location struct {
 		Agent *Agent
@@ -125,16 +142,30 @@ func (env *Environment) Run(iter int) {
 			})
 		}
 	}
+	for i := 0; i < 7; i++ {
+		env.Aggressiveness[i] = uint32(0)
+	}
 	for i := range list {
+		brn := list[i].Agent.Brain.getGene()
+		env.Aggressiveness[1] += popCount(brn)
+		env.Aggressiveness[2] += 2*popCount(brn & 0xFFFF0000)
+		env.Aggressiveness[3] += 2*popCount(brn & 0xFF00FF00)
+		env.Aggressiveness[4] += 2*popCount(brn & 0xF0F0F0F0)
+		env.Aggressiveness[5] += 2*popCount(brn & 0x33333333)
+		env.Aggressiveness[6] += 2*popCount(brn & 0x55555555)
 		if list[i].Agent.Health > 0 {
 			continue
 		}
 		longestLife := -1
 		bestBrain := ^uint32(0)
 		var bestFace Face
-		for j := range list {
-			if list[j].Agent.Health > 0 && list[j].Agent.Age > longestLife{
-				longestLife = list[j].Agent.Age
+		for _, j := range rand.Perm(len(list)) {
+			if list[j].Agent.Health > 0 && ((RewardLongevity && list[j].Agent.Age > longestLife) || (!RewardLongevity && list[j].Agent.Health > longestLife)) {
+				if RewardLongevity {
+					longestLife = list[j].Agent.Age
+				} else {
+					longestLife = list[j].Agent.Health
+				}
 				bestBrain = list[j].Agent.Brain.getGene()
 				bestFace = list[j].Agent.Face
 			}
@@ -150,10 +181,11 @@ func (env *Environment) Run(iter int) {
 		list[i].Agent.Brain.resetWithGene(bestBrain ^ (1 << uint32(rand.Intn(32))))
 		list[i].Agent.Direction = Direction(rand.Intn(4))
 	}
-	for i := range list { // _, r := range rand.Perm(len(list))
+	for i := range list {
 		list[i].Agent.Act(list[i].X, list[i].Y, env)
 	}
-	if Iteration-RecordIteration <= iter {
+	env.Aggressiveness[0] <<= uint32(5)
+	if RecordGIF && Iteration-RecordIteration <= iter {
 		env.drawFrame(iter - Iteration + RecordIteration)
 	}
 }
