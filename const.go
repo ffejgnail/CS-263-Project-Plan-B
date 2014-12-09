@@ -18,5 +18,8 @@ const (
 
 const (
 	RecordGIF       = false
+	ObserveGene     = false
 	RewardLongevity = true
+	FoodDstrbCenter = true
+	FoodDstrbRand   = false
 )

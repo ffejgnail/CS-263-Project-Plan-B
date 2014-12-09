@@ -44,18 +44,28 @@ func NewEnvironment() *Environment {
 
 	env := new(Environment)
 
-//	cx := EnvSize / 2
-//	cy := EnvSize / 2
-//	for i := -4; i <= 4; i++ {
-//		for j := -4; j <= 4; j++ {
-//			for k := 0; k <= 4; k++ {
-//				if i*i+j*j <= k*k {
-//					env.relCell(cx, cy, i, j).Food = uint8(4 - k)
-//					break
-//				}
-//			}
-//		}
-//	}
+	if FoodDstrbRand {
+		for i := 0; i < EnvSize; i++ {
+			for j := 0; j < EnvSize; j++ {
+				env.Cell[i][j].Food = uint8(rand.Intn(5))
+			}
+		}
+	}
+
+	if FoodDstrbCenter {
+		cx := EnvSize / 2
+		cy := EnvSize / 2
+		for i := -4; i <= 4; i++ {
+			for j := -4; j <= 4; j++ {
+				for k := 0; k <= 4; k++ {
+					if i*i+j*j <= k*k {
+						env.relCell(cx, cy, i, j).Food = uint8(4 - k)
+						break
+					}
+				}
+			}
+		}
+	}
 
 	for i := uint8(0); i < InitAnimatNum; i++ {
 		brain := new(SimpleBrain)
@@ -184,7 +194,9 @@ func (env *Environment) Run(iter int) {
 	for i := range list {
 		list[i].Agent.Act(list[i].X, list[i].Y, env)
 	}
-	env.Aggressiveness[0] <<= uint32(5)
+	if ObserveGene {
+		env.Aggressiveness[0] <<= uint32(5)
+	}
 	if RecordGIF && Iteration-RecordIteration <= iter {
 		env.drawFrame(iter - Iteration + RecordIteration)
 	}
